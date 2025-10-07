@@ -1,0 +1,16 @@
+{
+    "id": "ZINC_Vendors",
+    "name": "ZINC Vendors",
+    "description": "Obtain ZINC Vendors",
+    "author": "Helena Martin",
+    "version": "0.0.1",
+    "pluginFile": "plugin.py",
+    "minHorusVersion": "0.6.2",
+    "maxHorusVersion": null,
+    "platforms": [
+        "universal"
+    ],
+    "externalURL": null,
+    "dependencies": ["lxml>=4.9,<5", "soupsieve<2.0", "selenium==4.25.0", "beautifulsoup4==4.12.3", "typing_extensions==4.12.2", "requests==2.32.3", "requests-toolbelt==0.8.0", "rfc3986==1.4.0", "importlib-metadata==3.6", "keyring==15.1", "urllib3==2.2.3", "pandas"],
+    "pluginRequires": []
+}
