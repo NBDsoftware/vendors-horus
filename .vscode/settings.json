@@ -1,0 +1,22 @@
+{
+  "python.analysis.extraPaths": ["vendors_horus/Include"],
+  "python.languageServer": "Pylance",
+  "python.testing.pytestEnabled": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "always"
+  },
+  "editor.stickyScroll.enabled": true,
+  "files.autoSave": "onWindowChange",
+  "git.autofetch": true,
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.rulers": [79]
+  },
+  "[yaml]": {
+    "editor.tabSize": 2
+  },
+  "black-formatter.args": ["--line-length", "79", "--unstable"],
+  "cSpell.files": ["*.rst"]
+}

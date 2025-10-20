@@ -1,5 +1,10 @@
+"""
+Vendors Horus Block
+"""
+
 import os.path
-from HorusAPI import SlurmBlock, PluginVariable, VariableTypes, PluginBlock, Extensions
+
+from HorusAPI import Extensions, PluginBlock, PluginVariable, VariableTypes
 
 # Input CSV
 
@@ -7,7 +12,7 @@ vendors_input = PluginVariable(
     id="vendors_input",
     name="Input CSV with IDs",
     type=VariableTypes.FILE,
-    description="CSV file with ZINC IDs."
+    description="CSV file with ZINC IDs.",
 )
 
 vendors_output = PluginVariable(
@@ -18,52 +23,63 @@ vendors_output = PluginVariable(
     allowedValues=["csv"],
 )
 
+
 def extract_vendors(block: PluginBlock):
+    """
+    Extract ZINC vendors from a CSV file containing ZINC IDs.
+    """
+
     # --------------------------------------------------------------------
     #  Create Dummy HTML package
     # --------------------------------------------------------------------
-    import sys, types, importlib.machinery, importlib.util
+    import importlib.machinery
+    import importlib.util
+    import sys
+    import types
 
-    if 'html' not in sys.modules or not hasattr(sys.modules['html'], 'parser'):
-        parser_stub = types.ModuleType('html.parser')
+    if "html" not in sys.modules or not hasattr(sys.modules["html"], "parser"):
+        parser_stub = types.ModuleType("html.parser")
 
         class _DummyHTMLParser:
             pass
 
         parser_stub.HTMLParser = _DummyHTMLParser
         parser_spec = importlib.util.spec_from_loader(
-            'html.parser', loader=importlib.machinery.SourceFileLoader('html.parser', '<stub>')
+            "html.parser",
+            loader=importlib.machinery.SourceFileLoader(
+                "html.parser", "<stub>"
+            ),
         )
         parser_stub.__spec__ = parser_spec
-        sys.modules['html.parser'] = parser_stub
+        sys.modules["html.parser"] = parser_stub
 
-        html_pkg = types.ModuleType('html')
+        html_pkg = types.ModuleType("html")
         html_pkg.__path__ = []
         html_pkg.parser = parser_stub
         html_spec = importlib.util.spec_from_loader(
-            'html', loader=None, is_package=True
+            "html", loader=None, is_package=True
         )
         html_pkg.__spec__ = html_spec
-        sys.modules['html'] = html_pkg
+        sys.modules["html"] = html_pkg
 
-    import pathlib
     import importlib
+    from collections import defaultdict
+
     import pandas as pd
     from bs4 import BeautifulSoup
-    from collections import defaultdict
     from selenium import webdriver
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.ui import WebDriverWait
 
     service = Service()
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     driver = webdriver.Chrome(service=service, options=options)
     driver.set_page_load_timeout(800)
-    print('set timeout at 800')
-    ids=pd.read_csv(block.inputs[vendors_input.id]).iloc[:,0]
+    print("set timeout at 800")
+    ids = pd.read_csv(block.inputs[vendors_input.id]).iloc[:, 0]
 
     df3 = pd.DataFrame(columns=["URL"])
 
@@ -120,10 +136,7 @@ def extract_vendors(block: PluginBlock):
 
     block.setOutput(vendors_output.id, new_filename)
 
-    Extensions().loadCSV(new_filename,'results')
-
-
-
+    Extensions().loadCSV(new_filename, "results")
 
 
 extract_vendors_block = PluginBlock(
@@ -134,5 +147,5 @@ extract_vendors_block = PluginBlock(
     inputs=[vendors_input],
     variables=[vendors_input],
     outputs=[vendors_output],
-    category="ZINC"
+    category="ZINC",
 )

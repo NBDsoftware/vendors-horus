@@ -1,0 +1,18 @@
+# Base requirements for development
+black
+isort
+pylint
+flake8
+pytest
+pytest-cov
+pyright
+mypy
+flake8-pyproject
+
+# Horus API for plugin development
+HorusAPI
+
+# Plugin-sepecific requirements
+selenium
+pandas
+beautifulsoup4
