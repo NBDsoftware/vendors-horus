@@ -84,7 +84,7 @@ def extract_vendors(block: PluginBlock):
     df3 = pd.DataFrame(columns=["URL"])
 
     for i in ids:
-        url = f"https://zinc.docking.org/substances/{i}"
+        url = f"https://cartblanche22.docking.org/substance/{i}"
         driver.get(url)
 
         try:
