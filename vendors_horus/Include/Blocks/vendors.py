@@ -29,109 +29,106 @@ def extract_vendors(block: PluginBlock):
     Extract ZINC vendors from a CSV file containing ZINC IDs.
     """
 
-    # --------------------------------------------------------------------
-    #  Create Dummy HTML package
-    # --------------------------------------------------------------------
-    import importlib.machinery
-    import importlib.util
-    import sys
-    import types
-
-    if "html" not in sys.modules or not hasattr(sys.modules["html"], "parser"):
-        parser_stub = types.ModuleType("html.parser")
-
-        class _DummyHTMLParser:
-            pass
-
-        parser_stub.HTMLParser = _DummyHTMLParser
-        parser_spec = importlib.util.spec_from_loader(
-            "html.parser",
-            loader=importlib.machinery.SourceFileLoader(
-                "html.parser", "<stub>"
-            ),
-        )
-        parser_stub.__spec__ = parser_spec
-        sys.modules["html.parser"] = parser_stub
-
-        html_pkg = types.ModuleType("html")
-        html_pkg.__path__ = []
-        html_pkg.parser = parser_stub
-        html_spec = importlib.util.spec_from_loader(
-            "html", loader=None, is_package=True
-        )
-        html_pkg.__spec__ = html_spec
-        sys.modules["html"] = html_pkg
-
-    import importlib
-    from collections import defaultdict
-
     import pandas as pd
     from bs4 import BeautifulSoup
+    from collections import defaultdict
+
     from selenium import webdriver
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
-    from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.common.exceptions import TimeoutException
 
     service = Service()
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
-    driver = webdriver.Chrome(service=service, options=options)
-    driver.set_page_load_timeout(800)
-    print("set timeout at 800")
-    ids = pd.read_csv(block.inputs[vendors_input.id]).iloc[:, 0]
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("start-maximized")
 
-    df3 = pd.DataFrame(columns=["URL"])
+    driver = webdriver.Chrome(service=service, options=options)
+
+    def norm(s: str) -> str:
+        return " ".join(s.split())
+
+    def wait_for_any_layout(driver, timeout=25):
+        wait = WebDriverWait(driver, timeout)
+
+        def ready(d):
+            # NEW vendor table headers exist
+            has_vendor_hdr = (
+                    d.find_elements(By.XPATH, "//table//thead//th[normalize-space()='Catalog Name']") and
+                    d.find_elements(By.XPATH, "//table//thead//th[normalize-space()='Supplier code']")
+            )
+            if has_vendor_hdr:
+                return True
+
+            # OLD layout exists
+            if d.find_elements(By.CSS_SELECTOR, "div.catalogs dl.dl-delimited dt"):
+                return True
+
+            # still loading
+            if d.find_elements(By.CSS_SELECTOR, ".spinner-border"):
+                return False
+
+            # keep waiting
+            return False
+
+        wait.until(ready)
+
+    rows = []
 
     for i in ids:
-        url = f"https://zinc.docking.org/substances/{i}"
+        url = f"https://cartblanche22.docking.org/substance/{i}"
         driver.get(url)
 
         try:
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "div.catalogs dl.dl-delimited")
-                )
-            )
-        except Exception:
-            print(f"[WARN] Vendors not founf for {i}")
+            wait_for_any_layout(driver, timeout=35)
+        except TimeoutException:
+            rows.append({"molecule_id": i})
             continue
 
-        soup = BeautifulSoup(driver.page_source, "lxml")
-        vendors_dl = soup.select_one("div.catalogs dl.dl-delimited")
-        if vendors_dl is None:
-            print(f"[WARN] Vendors not found for {i}")
-            continue
+        root_html = driver.find_element(By.CSS_SELECTOR, "#root").get_attribute("outerHTML")
+        soup = BeautifulSoup(root_html, "html.parser")
 
         vendor_ids = defaultdict(list)
 
-        for dt in vendors_dl.select("dt"):
-            vendor = dt.get_text(strip=True)
-            dd = dt.find_next_sibling("dd")
+        vendor_table = None
+        for t in soup.select("table"):
+            headers = [norm(th.get_text(" ", strip=True)) for th in t.select("thead th")]
+            if len(headers) >= 2 and headers[0] == "Catalog Name" and headers[1] == "Supplier code":
+                vendor_table = t
+                break
 
-            ids = [a.get_text(strip=True) for a in dd.select("a")]
-            ids = list(dict.fromkeys(ids))
+        if vendor_table:
+            for tr in vendor_table.select("tbody tr"):
+                tds = tr.find_all("td")
+                if len(tds) < 2:
+                    continue
 
-            vendor_ids[vendor].extend(ids)
+                vendor = norm(tds[0].get_text(" ", strip=True))
+                code_el = tds[1].select_one("button, a")
+                code = norm(code_el.get_text(" ", strip=True) if code_el else tds[1].get_text(" ", strip=True))
 
-        row_idx = len(df3)  # nueva fila
-        df3.loc[row_idx, "URL"] = url
+                if vendor and code:
+                    vendor_ids[vendor].append(code)
 
-        for vendor, ids in vendor_ids.items():
-            if vendor not in df3.columns:
-                df3[vendor] = 0
-            df3.at[row_idx, vendor] = " ".join(ids)
+        else:
+            print(f"Could not find vendors table for compound {i}")
 
-        for col in df3.columns:
-            if col not in ("URL", *vendor_ids.keys()):
-                df3.at[row_idx, col] = 0
+        for vendor, codes in vendor_ids.items():
+            vendor_ids[vendor] = list(dict.fromkeys(codes))
+
+        row = {"molecule_id": i}
+        for vendor, codes in vendor_ids.items():
+            row[vendor] = " ".join(codes)  # or ",".join(codes)
+
+        rows.append(row)
 
     driver.quit()
-    print("Scraping finished.")
-    input_csv = block.inputs[vendors_input.id]
-    new_filename = os.path.basename(input_csv) + "_results.csv"
 
-    results = pd.DataFrame(df3)
+    results = pd.DataFrame(rows)
     results.drop_duplicates().to_csv(new_filename)
 
     block.setOutput(vendors_output.id, new_filename)
