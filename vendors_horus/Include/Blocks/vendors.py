@@ -129,7 +129,10 @@ def extract_vendors(block: PluginBlock):
         rows.append(row)
 
     driver.quit()
-
+    
+    input_csv = block.inputs[vendors_input.id]
+    new_filename = os.path.basename(input_csv) + "_results.csv"
+    
     results = pd.DataFrame(rows)
     results.drop_duplicates().to_csv(new_filename)
 
