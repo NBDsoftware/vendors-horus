@@ -79,6 +79,8 @@ def extract_vendors(block: PluginBlock):
 
     rows = []
 
+    ids = pd.read_csv(block.inputs[vendors_input.id]).iloc[:, 0]
+
     for i in ids:
         url = f"https://cartblanche22.docking.org/substance/{i}"
         driver.get(url)
